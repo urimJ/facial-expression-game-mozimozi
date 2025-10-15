@@ -42,10 +42,11 @@ mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 # max_num_hands=1로 설정하여 하나의 손만 인식합니다.
 hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.5, min_tracking_confidence = 0.5)
-GLOBAL_TRAIN_ANGLES = pd.read_csv('data_hand.csv', header=None).values[0]
+GLOBAL_TRAIN_ANGLES = pd.read_csv('data_hand.csv', header=None).values
 
 GESTURE_LABELS = {
-    1: 'FIST'
+    1: 'OKAY', 2: 'PINCH', 3:'PEACE', 4: 'LOVE', 5: 'CALL', 6: 'POINTUP', 
+    7: 'YOU', 8:'GOOD', 9: 'BAD', 10: 'FIST'
 }
 
 # 모양 특징 추출 함수: 관절 각도 계산
@@ -75,56 +76,37 @@ def calculate_joint_angles(joint):
 
 
 # 제스처 인식 및 유사도 판별
-def recognize_hand_gesture(img):
-    """
-    입력 이미지에서 손을 감지하고, 관절 각도 추출하여 k-NN 모델로 예측
-    """
-
-
+def recognize_hand_gesture(img, emoji):
+    
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = hands.process(img_rgb)
-    
     # 예측 결과를 이미지에 시각화하기 위한 복사본
-    annotated_img = img.copy() 
-    
+    annotated_img = img.copy()
     if results.multi_hand_landmarks:
         for hand_landmarks in results.multi_hand_landmarks:
             # 랜드마크 시각화 (빨간 점과 연결선)
             mp_drawing.draw_landmarks(
-                annotated_img, 
-                hand_landmarks, 
+                annotated_img,
+                hand_landmarks,
                 mp_hands.HAND_CONNECTIONS,
                 # 랜드마크 스타일 설정
                 mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2), # Green landmarks
                 # 연결선 스타일 설정
                 mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2) # Blue connections
             )
-
             # 랜드마크 좌표 추출
             joint = np.zeros((21, 3))
             for j, lm in enumerate(hand_landmarks.landmark):
                 joint[j] = [lm.x, lm.y, lm.z]
-
             # 관절 각도 계산 (15개 특징 벡터)
             current_angles = calculate_joint_angles(joint)
-
-            train_angles = GLOBAL_TRAIN_ANGLES[:15] # 학습 데이터
-
-            # 2. 코사인 유사도 계산
-            norm_current = np.linalg.norm(current_angles)
-            norm_train = np.linalg.norm(train_angles)
-
-            # 내적
-            dot_product = np.dot(current_angles, train_angles)
-
-            # 코사인 유사도: 내적/(크기의 곱)
-            # 코사인 유사도 값 (1: 완전 일치)
-            epsilon = 1e-12
-            cosine_similarities = dot_product / (norm_current * norm_train + epsilon)
-            
-            distance_percent = cosine_similarities * 100
-            return distance_percent
-
+            label = int(emoji.split('_')[0])
+            train_angles = GLOBAL_TRAIN_ANGLES[GLOBAL_TRAIN_ANGLES[:,15] == label][0, :15]
+            distance = np.linalg.norm(current_angles - train_angles)
+            sigma = 100
+            similarity = np.exp(-(distance ** 2) / (2 * sigma ** 2))
+            print(similarity * 100)
+            return similarity * 100
     # 손이 인식되지 않았을 경우
     return 0
 

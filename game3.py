@@ -113,7 +113,7 @@ def similarity_worker(item_queue, similarity_value):
                 if f.lower().endswith(('.png', '.jpg', '.jpeg')) and not f.startswith('.')
             ]
             if emoji in emoji_hands:
-                similarity_value.value = recognize_hand_gesture(frame)
+                similarity_value.value = recognize_hand_gesture(frame, emoji)
             else: similarity_value.value = 0 if emoji == "" else calc_similarity(frame, emoji)
         except:
             print("유사도 계산 실패!")
